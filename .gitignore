@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build / deploy artifacts
+*.zip
+*.log
+
+# OS
+.DS_Store
+
+# Local IDE / agent config (not for public repo)
+.kiro/

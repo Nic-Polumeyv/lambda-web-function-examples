@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package greet.v1;
+
+// Greeter demonstrates the two RPC shapes that work on Lambda Web Functions'
+// HTTP/1.1 edge: unary and server-streaming. (Client-streaming and bidi need
+// HTTP/2, which the edge does not support.)
+service GreeterService {
+  // Unary: one request, one response.
+  rpc Greet(GreetRequest) returns (GreetResponse) {}
+
+  // Server-streaming: one request, a stream of responses.
+  rpc Countdown(CountdownRequest) returns (stream CountdownResponse) {}
+}
+
+message GreetRequest {
+  string name = 1;
+}
+
+message GreetResponse {
+  string greeting = 1;
+}
+
+message CountdownRequest {
+  int32 from = 1;
+}
+
+message CountdownResponse {
+  int32 value = 1;
+  int64 elapsed_ms = 2;
+}

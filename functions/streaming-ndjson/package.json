@@ -1,0 +1,11 @@
+{
+  "name": "streaming-ndjson",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chunked/NDJSON streaming demo for Lambda Web Functions (Hono)",
+  "main": "index.js",
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.14"
+  }
+}

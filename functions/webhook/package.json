@@ -1,0 +1,7 @@
+{
+  "name": "webhook-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Signature-verified webhook receiver demo for Lambda Web Functions",
+  "main": "index.js"
+}

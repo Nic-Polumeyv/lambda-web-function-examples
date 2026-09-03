@@ -1,0 +1,10 @@
+{
+  "name": "fastify-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fastify REST API demo for Lambda Web Functions",
+  "main": "index.js",
+  "dependencies": {
+    "fastify": "^5.2.0"
+  }
+}
