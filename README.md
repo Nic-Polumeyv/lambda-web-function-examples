@@ -56,8 +56,27 @@ Every function follows the same rules:
    (`process.env.AWS_LAMBDA_HTTP_ENDPOINT`, default `localhost:3000`). Your code must call
    `listen()` — a bare handler that never listens will not start.
 2. The entry file is **`index.js`**.
-3. **`GET /ping` is reserved** by the platform for health checks — use a namespaced path
-   like `/health` for your own checks.
+3. **`GET /ping` is reserved** by the platform (see Health checks below) — use a
+   namespaced path like `/health` for your own checks.
+
+## Health checks
+
+Verified behavior (tested against a live endpoint):
+
+- **`GET /ping` is answered by the platform and never reaches your app.** It returns the
+  plain string `healthy` with a `200`, and — unlike every other path — carries **none** of
+  the `lambda-web-*` response headers. A request counter in the app confirmed the app is
+  never invoked for `/ping`. So don't define your own `/ping` route; it will be shadowed.
+  Use a namespaced path like `/health` for application health (all the demos do).
+- **The platform's health check reflects only "is the server listening on port 3000," not
+  whether your app works.** With a function that stayed listening but returned `500` on
+  every real route, `/ping` still returned `200 healthy`. **A monitor pointed at `/ping`
+  can show green while every real request fails** — point uptime/synthetic checks at a
+  real application route instead.
+- **Startup readiness = the server calling `listen()` on port 3000.** The endpoint only
+  goes `Active` once the server is listening; a program that never listens fails to start.
+- **There is no configurable health-check / readiness / liveness setting** in the
+  `aws lambda-web` CLI — the `/ping` behavior above is fixed.
 
 ## Run locally
 
