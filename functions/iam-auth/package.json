@@ -1,0 +1,7 @@
+{
+  "name": "iam-auth-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IAM (SigV4) authenticated endpoint demo for Lambda Web Functions",
+  "main": "index.js"
+}

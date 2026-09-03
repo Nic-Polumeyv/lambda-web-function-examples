@@ -20,6 +20,7 @@ lock-in.
 | [`functions/streaming-ndjson`](functions/streaming-ndjson) | Chunked streaming (NDJSON + text) | Hono |
 | [`functions/rpc-connect`](functions/rpc-connect) | Connect + gRPC-Web RPC (unary + server-streaming) | [Connect](https://connectrpc.com/) |
 | [`functions/webhook`](functions/webhook) | Signature-verified webhook receiver (HMAC-SHA256) | built-in `http` |
+| [`functions/iam-auth`](functions/iam-auth) | IAM (SigV4) authenticated endpoint — verified signing recipe | built-in `http` |
 
 **Frameworks** — the same "just an HTTP server" contract, shown with popular API frameworks:
 
@@ -89,7 +90,9 @@ for fn in rest-hono sse-hono streaming-ndjson rpc-connect express fastify webhoo
 done
 ```
 
-(`webhook` reads a `WEBHOOK_SECRET` env var — add `--env WEBHOOK_SECRET=...` for it.)
+(`webhook` reads a `WEBHOOK_SECRET` env var — add `--env WEBHOOK_SECRET=...` for it.
+`iam-auth` should be deployed with `--auth-type IamAuth` — see its README and the Auth
+section below.)
 
 Tear down a function:
 
@@ -154,6 +157,43 @@ finish the rollout (or back to the old revision to roll back).
 > revisions on one function). Endpoint **type** (`HomeRegion`, `MultiRegion`, `PerRegion`)
 > is a separate *geographic* axis for where an endpoint serves from.
 
+## Auth
+
+Auth is set **per endpoint** (the `authType`), so one function can expose, say, a public
+endpoint and an IAM-locked endpoint at the same time. Two modes:
+
+### `ApplicationManaged` (default)
+
+The platform enforces **no** auth — every request reaches your app, and **your code is
+responsible for authenticating each request**. Use this when the endpoint is genuinely
+public, or when you do auth in the app: bearer tokens (JWT/OAuth), session cookies, API-key
+headers, or signature verification. All the demos here use `ApplicationManaged`;
+[`functions/webhook`](functions/webhook) is the canonical example of app-level auth (it
+verifies an HMAC signature in the handler because the platform isn't checking anything).
+
+### `IamAuth`
+
+The request must be **SigV4-signed** and the caller needs the
+`lambda:InvokeWebFunctionEndpoint` IAM permission; the platform rejects unsigned or
+unauthorized requests at the edge (an opaque `403`) before they reach your code. Good for
+service-to-service calls, internal APIs, or fronting with CloudFront OAC. Deploy with:
+
+```bash
+aws lambda-web deploy --name my-api --code . --auth-type IamAuth --create
+```
+
+The SigV4 recipe has three easy-to-miss requirements (each failure returns the same opaque
+`403`) — all verified against a live endpoint in [`functions/iam-auth`](functions/iam-auth):
+
+- **Signing service name is `lambda`** (not `execute-api` or `lambda-web`).
+- **`x-amz-content-sha256` header is mandatory** (the SHA-256 of the body). Some SigV4
+  helpers omit it — set it explicitly.
+- **IAM action `lambda:InvokeWebFunctionEndpoint`**, scoped to the endpoint ARN.
+
+To grant another account or service invoke access, attach a **resource policy** to the
+endpoint (`lambda:InvokeWebFunctionEndpoint` for that principal, scoped to the endpoint
+ARN). See [`functions/iam-auth`](functions/iam-auth) for the working signing example.
+
 ## Repo layout
 
 ```
@@ -165,6 +205,7 @@ finish the rollout (or back to the old revision to roll back).
     ├── streaming-ndjson/     # chunked NDJSON / text streaming (Hono)
     ├── rpc-connect/          # Connect + gRPC-Web RPC (Connect)
     ├── webhook/              # HMAC-signed webhook receiver (http)
+    ├── iam-auth/             # IAM (SigV4) authenticated endpoint (http)
     ├── express/              # REST (Express)
     └── fastify/              # REST (Fastify)
 ```
