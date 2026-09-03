@@ -62,5 +62,28 @@ The caller's IAM identity needs `lambda:InvokeWebFunctionEndpoint` on the endpoi
 ## Granting other principals (resource policy)
 
 To let another account or an AWS service (e.g. CloudFront) invoke the endpoint, attach a
-resource policy granting the `lambda:InvokeWebFunctionEndpoint` action to that principal,
-scoped to the endpoint ARN (typically with a source-ARN condition).
+**resource-based policy** to the function. The commands live under `aws lambda-web`, take
+the **function** ARN as `--resource-arn`, and the policy's `Resource` is scoped to the
+**endpoint** ARN. Verified round-trip (put → get → delete):
+
+```bash
+FN_ARN=arn:aws:lambda:<region>:<account>:web-function/<name>
+EP_ARN=$FN_ARN/endpoint/<endpoint-name>
+
+# grant a specific CloudFront distribution invoke access
+aws lambda-web put-resource-policy --resource-arn "$FN_ARN" --policy '{
+  "Version":"2012-10-17",
+  "Statement":[{
+    "Sid":"AllowCloudFront","Effect":"Allow",
+    "Principal":{"Service":"cloudfront.amazonaws.com"},
+    "Action":"lambda:InvokeWebFunctionEndpoint",
+    "Resource":"'"$EP_ARN"'",
+    "Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::<account>:distribution/<id>"}}
+  }]}'
+
+aws lambda-web get-resource-policy    --resource-arn "$FN_ARN"   # returns policy + RevisionId
+aws lambda-web delete-resource-policy --resource-arn "$FN_ARN"   # removes it
+```
+
+`put`/`get` return a `RevisionId` (optimistic-concurrency token). Removing the policy makes
+`get` return `ResourceNotFoundException: The function does not have a policy`.

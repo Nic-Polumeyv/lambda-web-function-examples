@@ -190,9 +190,12 @@ The SigV4 recipe has three easy-to-miss requirements (each failure returns the s
   helpers omit it — set it explicitly.
 - **IAM action `lambda:InvokeWebFunctionEndpoint`**, scoped to the endpoint ARN.
 
-To grant another account or service invoke access, attach a **resource policy** to the
-endpoint (`lambda:InvokeWebFunctionEndpoint` for that principal, scoped to the endpoint
-ARN). See [`functions/iam-auth`](functions/iam-auth) for the working signing example.
+To grant another account or service invoke access, attach a **resource policy** with
+`aws lambda-web put-resource-policy` (verified). It takes the **function** ARN as
+`--resource-arn`, and the policy grants `lambda:InvokeWebFunctionEndpoint` to the principal
+scoped to the **endpoint** ARN (typically with a source-ARN condition). See
+[`functions/iam-auth`](functions/iam-auth) for the working signing example and the
+put/get/delete commands.
 
 ## Repo layout
 
