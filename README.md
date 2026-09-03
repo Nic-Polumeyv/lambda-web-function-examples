@@ -97,6 +97,63 @@ Tear down a function:
 aws lambda-web delete-web-function --function-name rest-hono
 ```
 
+## Staging vs. prod
+
+You don't need separate functions, stacks, or accounts to run a staging→prod flow — it's
+built into the resource model. There are three layers:
+
+- **Function** — the top-level container (just a name).
+- **Revision** — an immutable snapshot of your code + config. Every deploy creates a new
+  one (`rev-xxxxx`); old revisions are retained.
+- **Endpoint** — a routable URL with its own auth type and a **revision-weights** table
+  that decides which revision(s) its traffic hits.
+
+The separation lives at the **endpoint** layer: a single function can have **multiple
+endpoints**, each pointing at different revisions and each with its own URL.
+
+### Two endpoints on one function
+
+Give a function both a `staging` and a `prod` endpoint — each gets a distinct URL:
+
+```bash
+# stand up a staging endpoint and deploy to it
+aws lambda-web deploy --name my-api --code . --endpoint-name staging --create
+
+# ...validate the staging URL, then stand up prod
+aws lambda-web deploy --name my-api --code . --endpoint-name prod --create
+```
+
+### Auto-deploy vs. pinned
+
+Each endpoint has an **auto-deployment mode** that controls how it tracks new revisions:
+
+- **`LatestRevision`** (default for `HomeRegion` endpoints) — the endpoint automatically
+  serves the newest revision. Deploy and traffic shifts. Good for `staging`/`dev`.
+- **`Disabled`** (pinned) — the endpoint stays on the revision(s) you set until you
+  explicitly repoint it. New deploys create revisions but don't touch its traffic. Good
+  for `prod`.
+
+A typical setup: `staging` on `LatestRevision` (always serves the latest build), `prod`
+pinned. You promote by pointing `prod` at the revision that `staging` already validated.
+
+### Canary / blue-green
+
+An endpoint's revision-weights can split traffic across **two** revisions (weights sum to
+100), which gives you canary and blue-green rollouts on a pinned endpoint:
+
+```bash
+# send 10% of prod traffic to a new revision, 90% to the current one
+aws lambda-web update-web-function-endpoint --function-name my-api --endpoint-name prod \
+  --revision-weights '[{"revisionId":"rev-new","weight":10},{"revisionId":"rev-old","weight":90}]'
+```
+
+Shift the weights toward the new revision as you gain confidence, then set it to 100 to
+finish the rollout (or back to the old revision to roll back).
+
+> **Geographic vs. lifecycle:** staging/prod is the *lifecycle* axis (endpoints +
+> revisions on one function). Endpoint **type** (`HomeRegion`, `MultiRegion`, `PerRegion`)
+> is a separate *geographic* axis for where an endpoint serves from.
+
 ## Repo layout
 
 ```
