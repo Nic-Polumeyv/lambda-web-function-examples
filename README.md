@@ -2,8 +2,8 @@
 
 A set of small, single-purpose functions that each demonstrate a web protocol or a popular
 framework running on **AWS Lambda Web Functions**. Every function is a plain Node.js HTTP
-server that listens on port 3000 — no Lambda handler, no API Gateway, no framework
-lock-in.
+server that listens on the port the platform assigns (port 3000 locally) — no Lambda
+handler, no API Gateway, no framework lock-in.
 
 > **Lambda Web Functions** run a web server on Lambda infrastructure: you write a standard
 > HTTP server and the platform gives it a public HTTPS URL. You write `http.createServer()`
@@ -20,7 +20,7 @@ lock-in.
 | [`functions/streaming-ndjson`](functions/streaming-ndjson) | Chunked streaming (NDJSON + text) | Hono |
 | [`functions/rpc-connect`](functions/rpc-connect) | Connect + gRPC-Web RPC (unary + server-streaming) | [Connect](https://connectrpc.com/) |
 | [`functions/webhook`](functions/webhook) | Signature-verified webhook receiver (HMAC-SHA256) | built-in `http` |
-| [`functions/iam-auth`](functions/iam-auth) | IAM (SigV4) authenticated endpoint — verified signing recipe | built-in `http` |
+| [`functions/iam-auth`](functions/iam-auth) | IAM (SigV4) authenticated endpoint | built-in `http` |
 
 **Frameworks** — the same "just an HTTP server" contract, shown with popular API frameworks:
 
@@ -45,36 +45,38 @@ Lambda Web Functions serve over **HTTP/1.1**. That shapes what works:
   provide. (`rpc-connect` exposes only unary and server-streaming; for server→client push
   use SSE via `sse-hono`.)
 
-Requests also have a maximum duration (function timeout, up to 900s), so long-lived
-streams and connections are bounded — there are no infinite SSE streams or sockets.
+Requests also have a maximum duration (the revision's `timeoutSeconds`, up to 900s), so
+long-lived streams and connections are bounded — there are no infinite SSE streams or
+sockets.
 
 ## The runtime contract
 
 Every function follows the same rules:
 
-1. It's a standard HTTP server that **listens on port 3000**
-   (`process.env.AWS_LAMBDA_HTTP_ENDPOINT`, default `localhost:3000`). Your code must call
-   `listen()` — a bare handler that never listens will not start.
-2. The entry file is **`index.js`**.
+1. It's a standard HTTP server that **listens on the host and port given by
+   `AWS_LAMBDA_HTTP_ENDPOINT`** (default `localhost:3000` when the variable is unset, which
+   is only the case in local runs). Your code must call `listen()` — a bare handler that
+   never listens will not start. The server must begin listening within 10 seconds of
+   startup.
+2. The entry file is **`index.js`** by default. To use a different entry file, set
+   `AWS_LAMBDA_NODEJS_ENTRYPOINT`, or pass `--entry-point` at deploy time.
 3. **`GET /ping` is reserved** by the platform (see Health checks below) — use a
    namespaced path like `/health` for your own checks.
 
 ## Health checks
 
-Verified behavior (tested against a live endpoint):
-
 - **`GET /ping` is answered by the platform and never reaches your app.** It returns the
   plain string `healthy` with a `200`, and — unlike every other path — carries **none** of
-  the `lambda-web-*` response headers. A request counter in the app confirmed the app is
-  never invoked for `/ping`. So don't define your own `/ping` route; it will be shadowed.
-  Use a namespaced path like `/health` for application health (all the demos do).
-- **The platform's health check reflects only "is the server listening on port 3000," not
-  whether your app works.** With a function that stayed listening but returned `500` on
-  every real route, `/ping` still returned `200 healthy`. **A monitor pointed at `/ping`
-  can show green while every real request fails** — point uptime/synthetic checks at a
-  real application route instead.
-- **Startup readiness = the server calling `listen()` on port 3000.** The endpoint only
-  goes `Active` once the server is listening; a program that never listens fails to start.
+  the `lambda-web-*` response headers. Don't define your own `/ping` route; it will be
+  shadowed. Use a namespaced path like `/health` for application health (all the demos do).
+- **The platform's health check reflects only "is the server listening on the configured
+  port," not whether your app works.** A function that stays listening but returns `500`
+  on every real route will still show `/ping` returning `200 healthy`. A monitor pointed at
+  `/ping` can show green while every real request fails — point uptime/synthetic checks at
+  a real application route instead.
+- **Startup readiness = the server calling `listen()`** on the host/port from
+  `AWS_LAMBDA_HTTP_ENDPOINT`. The endpoint only goes `Active` once the server is listening;
+  a program that never listens fails to start.
 - **There is no configurable health-check / readiness / liveness setting** in the
   `aws lambda-web` CLI — the `/ping` behavior above is fixed.
 
@@ -92,16 +94,18 @@ node index.js        # listens on http://localhost:3000
 
 ## Deploy
 
-Deploy any function with the AWS CLI's one-command web deploy — it bundles the folder,
-provisions the S3 artifact bucket and execution role, creates the function + endpoint, and
-prints a live URL:
+Deploy any function with the one-command web deploy — it bundles the folder, provisions the
+S3 artifact bucket and execution role, creates the function + endpoint, and prints a live
+URL:
 
 ```bash
 aws lambda-web deploy --name rest-hono --code ./functions/rest-hono --create
 ```
 
 Re-run the same command to ship changes (it deploys a new revision and points the endpoint
-at it). To deploy all of them:
+at it).
+
+To deploy all of them:
 
 ```bash
 for fn in rest-hono sse-hono streaming-ndjson rpc-connect express fastify webhook; do
@@ -176,6 +180,35 @@ finish the rollout (or back to the old revision to roll back).
 > revisions on one function). Endpoint **type** (`HomeRegion`, `MultiRegion`, `PerRegion`)
 > is a separate *geographic* axis for where an endpoint serves from.
 
+### Multi-region
+
+A `HomeRegion` endpoint (the default) serves from a single Region. Pass `--endpoint-type
+MultiRegion` and a `--regions` list to replicate the function and get one global, latency-
+routed URL instead:
+
+```bash
+aws lambda-web deploy \
+  --name rest-hono-multiregion \
+  --code ./functions/rest-hono \
+  --endpoint-name global \
+  --endpoint-type MultiRegion \
+  --regions us-east-1,us-west-2 \
+  --create
+```
+
+`--regions` must include at least one Region other than the home Region (the home Region
+is added automatically) — you can't change the endpoint's type or its Region list after
+creation. Every request routes to whichever Region in the list has the lowest latency for
+that caller.
+
+The domain shape changes too: a `HomeRegion` endpoint's URL is
+`<domain-id>.<shard-id>.lambda-web.<region>.on.aws`, but a `MultiRegion` endpoint drops the
+shard and Region segments for a single global domain —
+`<domain-id>.lambda-web.global.on.aws`.
+
+`PerRegion` is a third endpoint type: instead of one global URL, each Region in `--regions`
+gets its own separate endpoint and domain, with no latency-based routing between them.
+
 ## Auth
 
 Auth is set **per endpoint** (the `authType`), so one function can expose, say, a public
@@ -192,27 +225,30 @@ verifies an HMAC signature in the handler because the platform isn't checking an
 
 ### `IamAuth`
 
-The request must be **SigV4-signed** and the caller needs the
-`lambda:InvokeWebFunctionEndpoint` IAM permission; the platform rejects unsigned or
-unauthorized requests at the edge (an opaque `403`) before they reach your code. Good for
-service-to-service calls, internal APIs, or fronting with CloudFront OAC. Deploy with:
+The request must be **SigV4-signed** (SigV4a, signed with the Region set `*`, for a
+`MultiRegion` global domain; `HomeRegion` and `PerRegion` endpoints use plain per-Region
+SigV4) and the caller needs the `lambda:InvokeWebFunctionEndpoint` IAM permission; the
+platform rejects unsigned or unauthorized requests at the edge (an opaque `403`) before
+they reach your code. Good for service-to-service calls, internal APIs, or fronting with
+CloudFront OAC. Deploy with:
 
 ```bash
 aws lambda-web deploy --name my-api --code . --auth-type IamAuth --create
 ```
 
 The SigV4 recipe has three easy-to-miss requirements (each failure returns the same opaque
-`403`) — all verified against a live endpoint in [`functions/iam-auth`](functions/iam-auth):
+`403`) — see [`functions/iam-auth`](functions/iam-auth) for the full signing example:
 
 - **Signing service name is `lambda`** (not `execute-api` or `lambda-web`).
-- **`x-amz-content-sha256` header is mandatory** (the SHA-256 of the body). Some SigV4
-  helpers omit it — set it explicitly.
+- **`x-amz-content-sha256` header is mandatory** on every signed request, even bodyless
+  ones (the SHA-256 of the body, or the literal `UNSIGNED-PAYLOAD` if you aren't signing
+  the body). Some SigV4 helpers omit it — set it explicitly.
 - **IAM action `lambda:InvokeWebFunctionEndpoint`**, scoped to the endpoint ARN.
 
 To grant another account or service invoke access, attach a **resource policy** with
-`aws lambda-web put-resource-policy` (verified). It takes the **function** ARN as
-`--resource-arn`, and the policy grants `lambda:InvokeWebFunctionEndpoint` to the principal
-scoped to the **endpoint** ARN (typically with a source-ARN condition). See
+`aws lambda-web put-resource-policy`. It takes the **function** ARN as `--resource-arn`,
+and the policy grants `lambda:InvokeWebFunctionEndpoint` to the principal scoped to the
+**endpoint** ARN (typically with a source-ARN condition). See
 [`functions/iam-auth`](functions/iam-auth) for the working signing example and the
 put/get/delete commands.
 
