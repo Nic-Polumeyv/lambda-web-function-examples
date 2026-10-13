@@ -10,3 +10,18 @@ node_modules/
 
 # Local IDE / agent config (not for public repo)
 .kiro/
+
+# spuf (local deploy tooling — state, config, manifest)
+.spuf.json
+.spuf.web.json
+spuf.config.json
+spuf.manifest.json
+
+# Temporary deploy notes (not for public repo)
+DEPLOY-TEMP.md
+
+# Workflow task scratch output (deploy logs, ARNs, account info — not for public repo)
+.agents/
+
+# Blog drafts and artifacts (personal, not part of the public sample repo)
+blog/

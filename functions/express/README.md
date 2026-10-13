@@ -2,7 +2,7 @@
 
 Demonstrates a conventional [Express](https://expressjs.com/) REST API running unmodified
 on Lambda Web Functions — routing, JSON body parsing, path params, and middleware all work
-because the runtime just needs an HTTP server on port 3000.
+because the runtime just needs an HTTP server listening on the host/port it assigns.
 
 ## Routes
 

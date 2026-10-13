@@ -1,13 +1,15 @@
 # Lambda Web Functions — Protocol Demos
 
+**AWS Lambda Web Functions** — [announcement blog post](https://aws.amazon.com/blogs/aws/announcing-aws-lambda-web-functions-for-fast-consistent-web-app-performance-anywhere/) · [developer guide](https://docs.aws.amazon.com/lambda/latest/dg/web-functions.html)
+
 A set of small, single-purpose functions that each demonstrate a web protocol or a popular
 framework running on **AWS Lambda Web Functions**. Every function is a plain Node.js HTTP
 server that listens on the port the platform assigns (port 3000 locally) — no Lambda
 handler, no API Gateway, no framework lock-in.
 
 > **Lambda Web Functions** run a web server on Lambda infrastructure: you write a standard
-> HTTP server and the platform gives it a public HTTPS URL. You write `http.createServer()`
-> (or use a framework like Hono), not an `exports.handler`.
+> HTTP server with `http.createServer()` (or a framework like Hono) that listens on a port,
+> the same code you'd run anywhere else, and the platform gives it a public HTTPS URL.
 
 ## What each function demonstrates
 
@@ -62,6 +64,10 @@ Every function follows the same rules:
    `AWS_LAMBDA_NODEJS_ENTRYPOINT`, or pass `--entry-point` at deploy time.
 3. **`GET /ping` is reserved** by the platform (see Health checks below) — use a
    namespaced path like `/health` for your own checks.
+4. Each execution environment handles multiple concurrent requests. Lambda manages a
+   dynamic per-environment concurrency limit automatically; `maxConcurrencyPerEnvironment`
+   (default **64**, configurable **1–128** via `--max-concurrency-per-environment`) sets
+   the upper bound Lambda won't exceed, not a fixed number every environment runs at.
 
 ## Health checks
 
@@ -164,8 +170,9 @@ pinned. You promote by pointing `prod` at the revision that `staging` already va
 
 ### Canary / blue-green
 
-An endpoint's revision-weights can split traffic across **two** revisions (weights sum to
-100), which gives you canary and blue-green rollouts on a pinned endpoint:
+An endpoint's revision-weights can split traffic across **up to two** revisions at a
+time, each independently weighted from 1–100 — AWS's own documented mechanism for canary
+and blue-green rollouts on a pinned endpoint:
 
 ```bash
 # send 10% of prod traffic to a new revision, 90% to the current one

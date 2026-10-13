@@ -2,7 +2,7 @@
 
 Demonstrates a [Fastify](https://fastify.dev/) REST API running unmodified on Lambda Web
 Functions — Fastify's routing, built-in JSON parsing, and handlers work as-is because the
-runtime just needs an HTTP server on port 3000.
+runtime just needs an HTTP server listening on the host/port it assigns.
 
 ## Routes
 

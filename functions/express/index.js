@@ -29,5 +29,9 @@ app.post('/echo', (req, res) =>
 
 app.use((req, res) => res.status(404).json({ error: 'Not Found', path: req.path }));
 
-// MUST listen on port 3000 — the Web Functions runtime expects this.
-app.listen(3000, '0.0.0.0', () => console.log('express listening on port 3000'));
+// MUST listen on the host/port given by AWS_LAMBDA_HTTP_ENDPOINT (host:port) —
+// the Web Functions runtime expects this. Falls back to localhost:3000 for
+// local runs where the variable is unset.
+const [hostname, portStr] = (process.env.AWS_LAMBDA_HTTP_ENDPOINT || 'localhost:3000').split(':');
+const port = Number(portStr);
+app.listen(port, hostname, () => console.log(`express listening on port ${port}`));

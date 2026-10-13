@@ -36,6 +36,12 @@ app.post('/echo', async (c) => {
 
 app.notFound((c) => c.json({ error: 'Not Found', path: new URL(c.req.url).pathname }, 404));
 
-serve({ fetch: app.fetch, port: 3000 }, (info) =>
+// Listen on the host/port the platform assigns via AWS_LAMBDA_HTTP_ENDPOINT
+// (host:port). Falls back to localhost:3000 for local runs where the
+// variable is unset.
+const [hostname, portStr] = (process.env.AWS_LAMBDA_HTTP_ENDPOINT || 'localhost:3000').split(':');
+const port = Number(portStr);
+
+serve({ fetch: app.fetch, hostname, port }, (info) =>
   console.log(`rest-hono listening on ${info.port}`)
 );

@@ -32,11 +32,15 @@ app.setNotFoundHandler((req, reply) =>
   reply.code(404).send({ error: 'Not Found', path: req.url }),
 );
 
-// MUST listen on port 3000 — the Web Functions runtime expects this.
-app.listen({ port: 3000, host: '0.0.0.0' }, (err) => {
+// MUST listen on the host/port given by AWS_LAMBDA_HTTP_ENDPOINT (host:port) —
+// the Web Functions runtime expects this. Falls back to localhost:3000 for
+// local runs where the variable is unset.
+const [host, portStr] = (process.env.AWS_LAMBDA_HTTP_ENDPOINT || 'localhost:3000').split(':');
+const port = Number(portStr);
+app.listen({ port, host }, (err) => {
   if (err) {
     console.error(err);
     process.exit(1);
   }
-  console.log('fastify listening on port 3000');
+  console.log(`fastify listening on port ${port}`);
 });

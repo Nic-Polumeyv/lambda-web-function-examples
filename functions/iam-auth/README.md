@@ -1,10 +1,11 @@
 # iam-auth
 
 Demonstrates an endpoint protected by **IAM authentication (SigV4)**. The application code
-is an ordinary HTTP server on port 3000 — what makes it IAM-protected is the **deploy-time**
-setting `--auth-type IamAuth`. With `IamAuth`, the platform verifies a SigV4 signature and
-the caller's IAM permission **before** the request reaches your code; unsigned or
-unauthorized requests are rejected at the edge with an opaque `403`.
+is an ordinary HTTP server listening on the host/port the platform assigns — what makes it
+IAM-protected is the **deploy-time** setting `--auth-type IamAuth`. With `IamAuth`, the
+platform verifies a SigV4 signature and the caller's IAM permission **before** the request
+reaches your code; unsigned or unauthorized requests are rejected at the edge with an
+opaque `403`.
 
 ## Deploy
 
@@ -12,11 +13,11 @@ unauthorized requests are rejected at the edge with an opaque `403`.
 aws lambda-web deploy --name iam-auth --code . --auth-type IamAuth --create
 ```
 
-## The SigV4 signing recipe (verified)
+## The SigV4 signing recipe
 
 Calling an `IamAuth` endpoint requires a correctly SigV4-signed request. Three details are
 easy to get wrong, and every mistake comes back as the **same opaque HTML `403`** with no
-error code — so they're hard to diagnose. All three were confirmed against a live endpoint:
+error code — so they're hard to diagnose:
 
 | Requirement | Wrong value → result |
 |---|---|
@@ -64,7 +65,7 @@ The caller's IAM identity needs `lambda:InvokeWebFunctionEndpoint` on the endpoi
 To let another account or an AWS service (e.g. CloudFront) invoke the endpoint, attach a
 **resource-based policy** to the function. The commands live under `aws lambda-web`, take
 the **function** ARN as `--resource-arn`, and the policy's `Resource` is scoped to the
-**endpoint** ARN. Verified round-trip (put → get → delete):
+**endpoint** ARN:
 
 ```bash
 FN_ARN=arn:aws:lambda:<region>:<account>:web-function/<name>

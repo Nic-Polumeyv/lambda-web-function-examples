@@ -67,5 +67,9 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
 });
 
-// MUST listen on port 3000 — the Web Functions runtime expects this.
-server.listen(3000, '0.0.0.0', () => console.log('webhook listening on port 3000'));
+// MUST listen on the host/port given by AWS_LAMBDA_HTTP_ENDPOINT (host:port) —
+// the Web Functions runtime expects this. Falls back to localhost:3000 for
+// local runs where the variable is unset.
+const [hostname, portStr] = (process.env.AWS_LAMBDA_HTTP_ENDPOINT || 'localhost:3000').split(':');
+const port = Number(portStr);
+server.listen(port, hostname, () => console.log(`webhook listening on port ${port}`));
