@@ -1,5 +1,7 @@
 # Lambda Web Functions — Protocol Demos
 
+> Companion code for [Why I'm Excited About AWS Lambda Web Functions](https://edjgeek.com/blog/why-i-m-excited-about-lambda-web-functions/) — clone this repo and run the examples alongside that post.
+
 [AWS Lambda Web Functions](https://aws.amazon.com/lambda/) let you run a real web server on
 Lambda infrastructure. You write a standard Node.js HTTP server with `http.createServer()`
 (or a framework like Hono), it listens on a port, and the platform hands it a public HTTPS
